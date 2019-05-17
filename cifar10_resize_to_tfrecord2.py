@@ -13,12 +13,14 @@ from __future__ import print_function
 import argparse
 import os
 import sys
+import cv2
 
 import tarfile
 from six.moves import cPickle as pickle
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 import numpy
+import matplotlib.pyplot as plt
 
 CIFAR_FILENAME = 'cifar-10-python.tar.gz'
 CIFAR_DOWNLOAD_URL = 'https://www.cs.toronto.edu/~kriz/' + CIFAR_FILENAME
@@ -69,13 +71,17 @@ def convert_to_tfrecord(input_files, output_file):
       labels = data_dict[b'labels']
       num_entries_in_batch = len(labels)
       for i in range(num_entries_in_batch):
-        foo_image = numpy.reshape(data[i], [3, 32, 32]).transpose([1, 2, 0])
+        image_hr = numpy.reshape(data[i], [3, 32, 32]).transpose([1, 2, 0])
+        height, width, channel = image_hr.shape
+        image_lr = cv2.resize(image_hr, dsize=(height//2, width//2))
+        image_lr = cv2.resize(image_lr, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
         example = tf.train.Example(features=tf.train.Features(
             feature={
-                'height': _int64_feature(32),
-                'width': _int64_feature(32),
-                'channel': _int64_feature(3),
-                'image_hr': _bytes_feature(tf.compat.as_bytes(foo_image.tostring())),
+                'height': _int64_feature(height),
+                'width': _int64_feature(width),
+                'channel': _int64_feature(channel),
+                'image_hr': _bytes_feature(tf.compat.as_bytes(image_hr.tostring())),
+                'image_lr': _bytes_feature(tf.compat.as_bytes(image_lr.tostring())),
                 'label': _int64_feature(labels[i])
             }))
         record_writer.write(example.SerializeToString())
